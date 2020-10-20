@@ -1,0 +1,6 @@
+tests:
+  dfu.mfu_ext:
+    platform_allow: native_posix nrf9160dk_nrf9160
+    tags: dfu mfu_ext
+    # TODO add overlay for 9160 with DK
+    # and add support for that as well

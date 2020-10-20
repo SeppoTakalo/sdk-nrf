@@ -1,0 +1,9 @@
+dummy_update:
+  size: 0x40000
+  address: 0x30000
+app:
+  size: 0x30000
+  address: 0x0
+EMPTY_0:
+  address: 0x70000
+  size: 0x90000

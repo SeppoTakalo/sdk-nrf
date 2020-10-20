@@ -1,0 +1,35 @@
+Segment = (
+    target_addr: uint,
+    len: uint
+)
+
+Segments = [ + Segment ]
+
+Manifest = [
+    version: uint,
+    compat: uint,
+    blob_hash: bstr,
+    segments: bstr .cbor Segments
+]
+
+Wrapper = #6.18(COSE_Sign1_Manifest)
+
+COSE_Sign1_Manifest = [
+    protected: bstr .cbor header_map,
+    unprotected: {},
+    payload : bstr .cbor Manifest,
+    signature : bstr
+]
+
+header_map = {
+    1 => sign_ES256  ; algorithm identifier
+}
+
+sign_ES256 = -7 ; ECDSA, SHA256
+
+Sig_structure1 = [
+    context : "Signature1",
+    body_protected : bstr .cbor header_map,
+    external_aad : '',   ; 0 length bstr
+    payload : bstr
+]

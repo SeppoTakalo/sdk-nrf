@@ -1,0 +1,18 @@
+#
+# Copyright (c) 2020 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menu "Modem Firmware Update (MFU)"
+
+config MGMT_MFU
+	bool "Serial Modem Firmware Update support"
+	depends on MCUMGR_SMP_UART
+	depends on MCUMGR
+	depends on SOC_NRF9160_SICA
+
+module=MGMT_MFU
+module-dep=LOG
+module-str=MFU
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
