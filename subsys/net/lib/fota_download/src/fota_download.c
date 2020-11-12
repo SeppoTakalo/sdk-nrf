@@ -9,13 +9,13 @@
 #include <net/fota_download.h>
 #include <net/download_client.h>
 #include <dfu/dfu_target.h>
+#include <dfu/dfu_target_mcuboot.h>
 #include <pm_config.h>
 
 #ifdef PM_S1_ADDRESS
 /* MCUBoot support is required */
 #include <fw_info.h>
 #include <secure_services.h>
-#include <dfu_target_mcuboot.h>
 #endif
 
 LOG_MODULE_REGISTER(fota_download, CONFIG_FOTA_DOWNLOAD_LOG_LEVEL);
@@ -313,11 +313,5 @@ int fota_download_init(fota_download_callback_t client_callback)
 
 	k_delayed_work_init(&dlc_with_offset_work, download_with_offset);
 
-	int err = download_client_init(&dlc, download_client_callback);
-
-	if (err != 0) {
-		return err;
-	}
-
-	return 0;
+	return download_client_init(&dlc, download_client_callback);
 }

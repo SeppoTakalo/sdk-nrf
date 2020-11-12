@@ -107,12 +107,17 @@ See the `Mobile network operator certifications`_ for more information.
    Most operators do not require other certifications than GCF or PTCRB.
    For the current status of GCF and PTCRB certifications, see `nRF9160 certifications`_.
 
-There are two ways to update the modem firmware:
+There are two ways to update the modem firmware, either through a full upgrade
+or delta patches:
 
 Full upgrade
-  A full upgrade of the modem firmware requires a wired connection.
-  The upgrade is done through the nRF Connect Programmer, which is part of `nRF Connect for Desktop`_.
+  A full upgrade of the modem firmware requires wired connection (JLink or UART) or an external flash with at least 2MiB.
+  For wired JLink connections, the upgrade is done through the nRF Connect Programmer, which is part of `nRF Connect for Desktop`_.
   See `Updating the nRF9160 DK cellular modem`_ in the nRF Connect Programmer User Guide for instructions.
+  For wired UART connections, the upgrade is performed using the SMP protocol.
+  See ``nrfjprog`` help text for instructions on how to perform this update.
+  For wireless connections the new modem firmware is banked in the external flash before it is passed on to the modem.
+  See the :ref:`http_application_update_sample` sample for an example implementation of full upgrade of the modem firmware.
 
 Delta patches
   Delta patches are upgrades that contain only the difference from the last version.
@@ -218,7 +223,7 @@ FOTA upgrades
 *************
 
 |fota_upgrades_def|
-FOTA upgrades can be used to apply delta patches to the `LTE modem`_ firmware and to replace the upgradable bootloader or the application.
+FOTA upgrades can be used to update `LTE modem`_ firmware (delta or full update) and to replace the upgradable bootloader or the application.
 
 .. note::
    Even though the Secure Partition Manager and the application are two individually compiled components, they are treated as a single binary blob in the context of firmware upgrades.

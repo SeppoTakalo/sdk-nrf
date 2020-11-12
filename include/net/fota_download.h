@@ -87,8 +87,7 @@ int fota_download_init(fota_download_callback_t client_callback);
 
 /**@brief Start downloading the given file from the given host.
  *
- * When the download is complete, the secondary slot of MCUboot is tagged as having
- * valid firmware inside it. The completion is reported through an event.
+ * When the download is complete, the configured callback is invoked.
  *
  * @param host Name of host to start downloading from. Can include scheme
  *             and port number, e.g. https://google.com:443

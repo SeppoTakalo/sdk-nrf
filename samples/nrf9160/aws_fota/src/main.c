@@ -51,6 +51,9 @@ static uint8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static uint8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 
+/* DFU buffer */
+static u8_t fota_buf[512];
+
 /* MQTT Broker details. */
 static struct sockaddr_storage broker_storage;
 
@@ -566,6 +569,12 @@ void main(void)
 	printk("LTE Link Connected!\n");
 
 	client_init(&client, CONFIG_MQTT_BROKER_HOSTNAME);
+
+	err = dfu_target_mcuboot_set_buf(fota_buf, sizeof(fota_buf));
+	if (err != 0) {
+		printk("ERROR: dfu_target_mcuboot_set_buf %d\n", err);
+		return;
+	}
 
 	err = aws_fota_init(&client, aws_fota_cb_handler);
 	if (err != 0) {

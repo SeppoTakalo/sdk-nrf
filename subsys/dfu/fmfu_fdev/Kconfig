@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2020 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menuconfig FMFU_FDEV
+	bool "Full Modem Firmware Upgrade from flash device"
+	depends on CDDL_GEN
+
+
+if (FMFU_FDEV)
+
+config MBEDTLS_HEAP_SIZE
+	int
+	default 4096
+
+module=FMFU_FDEV
+module-dep=LOG
+module-str=FMFU FDEV
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # FMFU_FDEV

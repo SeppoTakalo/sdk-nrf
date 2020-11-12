@@ -1,0 +1,85 @@
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+/** @file dfu_target_stream.h
+ *
+ * @defgroup dfu_target_stream Flash stream DFU Target
+ * @{
+ * @brief Provides an API for other DFU targets that need to write a large
+ *        object to flash.
+ */
+
+#ifndef DFU_TARGET_STREAM_H__
+#define DFU_TARGET_STREAM_H__
+
+#include <stddef.h>
+#include <storage/stream_flash.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct stream_flash_ctx *dfu_target_stream_get_stream(void);
+
+/**
+ * @brief Initialize dfu target.
+ *
+ * @param[in] id The identifier of the stream, used for storing settings.
+ * @param[in] fdev Flash device which the stream should be written to.
+ * @param[in] buf Buffer used for stream flash writing. The length of the
+ *                buffer must be smaller than a page size of @fdev.
+ * @param[in] len Length of @buf
+ * @param[in] offset Offset within @fdev to write the stream to.
+ * @param[in] size The number of bytes within fdev to use for the stream.
+ *                 Set to 0 to use all available memory in the device
+ *                 (starting from @offset).
+ * @param[in] db Callback invoked upon successful flash write operations. This
+ *               can be used to inspect the actual written data.
+ *
+ * @retval Non-negative value if successful, negative errno otherwise.
+ */
+int dfu_target_stream_init(const char *id, const struct device *fdev,
+			   uint8_t *buf, size_t len, size_t offset, size_t size,
+			   stream_flash_callback_t cb);
+
+/**
+ * @brief Get the offset within the payload of the next byte to download.
+ *
+ * This is used to pick up an aborted download. If for instance 0x1000 bytes
+ * of the payload has been downloaded and stored to flash, this would return
+ * 0x1000. For this function to work across reboots, the option
+ * 'CONFIG_DFU_TARGET_STREAM_SAVE_PROGRESS' must be set.
+ *
+ * @param[out] offset Returns the offset of the firmware upgrade.
+ *
+ * @return Non-negative value if success, otherwise negative value if unable
+ *         to get the offset
+ */
+int dfu_target_stream_offset_get(size_t *offset);
+
+/**
+ * @brief Write a chunk of firmware data.
+ *
+ * @param[in] buf Pointer to data that should be written.
+ * @param[in] len Length of data to write.
+ *
+ * @return Non-negative value on success, negative errno otherwise.
+ */
+int dfu_target_stream_write(const void *const buf, size_t len);
+
+/**
+ * @brief De-initialize resources and finalize stream flash write if successful.
+
+ * @param[in] successful Indicate whether the firmware was successfully
+ * received.
+ *
+ * @return Non-negative value on success, negative errno otherwise.
+ */
+int dfu_target_stream_done(bool successful);
+
+#endif /* DFU_TARGET_STREAM_H__ */
+
+/**@} */

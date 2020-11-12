@@ -74,7 +74,7 @@ API documentation
 *****************
 
 | Header file: :file:`include/dfu/dfu_target.h`
-| Source files: :file:`subsys/dfu/src/`
+| Source files: :file:`subsys/dfu/dfu_target/src/`
 
 .. doxygengroup:: dfu_target
    :project: nrf

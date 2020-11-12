@@ -35,6 +35,12 @@ manifest:
       url-base: https://github.com/alexa
     - name: hakonfam
       url-base: https://github.com/hakonfam
+    - name: oyro
+      url-base: https://github.com/oyvindronningstad
+    - name: lemrey
+      url-base: https://github.com/lemrey
+    - name: playground
+      url-base: https://github.com/NordicPlayground
 
   # If not otherwise specified, the projects below should be obtained
   # from the ncs remote.
@@ -52,7 +58,7 @@ manifest:
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
     - name: zephyr
       repo-path: sdk-zephyr
-      revision: 3366927a54986ad0ddf060d0e08ecc578adf11f0
+      revision: a3a6410b55fa97a9c6400c37d362c9137c5050b6
       import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
