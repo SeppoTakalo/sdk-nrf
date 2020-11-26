@@ -94,6 +94,16 @@ int cert_provision(void)
 	return 0;
 }
 
+static void print_modem_version(void)
+{
+	int err = at_cmd_write("AT+CGMR", modem_version, sizeof(modem_version),
+				NULL);
+
+	__ASSERT(err == 0, "Failed reading modem version");
+
+	printk("Current modem firmware version: %s", modem_version);
+}
+
 /**@brief Start transfer of the file. */
 static void app_dfu_transfer_start(struct k_work *unused)
 {
@@ -128,13 +138,26 @@ static void apply_fmfu(void)
 	int err;
 	const struct device *flash_dev = device_get_binding(EXT_FLASH_DEVICE);
 
+	err = libmodem_shutdown();
+	if (err != 0) {
+		printk("libmodem_shutdown() failed: %d\n", err);
+		return;
+	}
+
 	err = fmfu_fdev_load(fota_buf, sizeof(fota_buf), flash_dev, 0);
 	if (err != 0) {
 		printk("fmfu_fdev_load failed: %d\n", err);
 		return;
 	}
 
-	printk("Modem firmware update completed, please restart the device");
+	err = libmodem_init();
+	if (err != 0) {
+		printk("libmodem_init() failed: %d\n", err);
+		return;
+	}
+
+	printk("Modem firmware update completed");
+	print_modem_version();
 
 }
 
@@ -338,11 +361,7 @@ static void modem_configure(void)
 	__ASSERT(err == 0, "LTE link could not be established.");
 	printk("LTE Link Connected!\n");
 #endif
-	err = at_cmd_write("AT+CGMR", modem_version,
-			   sizeof(modem_version), NULL);
-	__ASSERT(err == 0, "Failed reading modem version");
-
-	printk("Current modem firmware version: %s", modem_version);
+	print_modem_version();
 }
 
 static int application_init(void)
@@ -409,14 +428,15 @@ void main(void)
 	}
 	printk("Initialized modem library\n");
 
-	modem_configure();
-
-	boot_write_img_confirmed();
-
 	/* START debug stuff */
 	apply_fmfu();
 
 	/* END debug stuff */
+
+	modem_configure();
+
+	boot_write_img_confirmed();
+
 
 	err = application_init();
 	if (err != 0) {

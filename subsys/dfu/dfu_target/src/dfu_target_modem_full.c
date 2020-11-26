@@ -60,7 +60,7 @@ int dfu_target_modem_full_done(bool successful)
 {
 	configured = false;
 
-	LOG_INF("FUll modem update completed");
+	LOG_INF("Modem firmware downloaded to flash device");
 
 	return dfu_target_stream_done(successful);
 }

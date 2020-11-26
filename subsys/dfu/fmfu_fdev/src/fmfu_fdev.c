@@ -13,7 +13,7 @@
 
 LOG_MODULE_REGISTER(fmfu_fdev, CONFIG_FMFU_FDEV_LOG_LEVEL);
 
-#define MAX_META_LEN sizeof(COSE_Sign1_Manifest_t)
+#define MAX_META_LEN 1000
 
 static int get_hash_from_flash(const struct device *fdev, size_t offset,
 			       size_t data_len, uint8_t *hash, uint8_t *buffer,
@@ -134,9 +134,12 @@ static int load_segments(const struct device *fdev, Segments_t *seg,
 			return err;
 		}
 
+		LOG_DBG("Modem state: %d", nrf_fmfu_modem_state_get());
+
 		err = nrf_fmfu_transfer_end();
 		if (err != 0) {
-			LOG_ERR("nrf_fmfu_transfer_end failed: %d", err);
+			LOG_ERR("nrf_fmfu_transfer_end failed, state: %d errno: %d",
+				nrf_fmfu_modem_state_get(), errno);
 			return err;
 		}
 
@@ -167,14 +170,15 @@ int fmfu_fdev_load(uint8_t *buf, size_t buf_len,
 	int err;
 
 	if (buf == NULL || fdev == NULL) {
-		LOG_ERR("Not initialized, please call fmfu_fdev_init()");
 		return -ENOMEM;
 	}
 
 	/* Put modem in DFU/RPC state */
-	err = nrf_fmfu_init(NULL, buf_len, buf);
+	err = nrf_fmfu_init(NULL, NRF_FMFU_MODEM_BUFFER_SIZE,
+		       	(uint8_t *)0x20010000);
 	if (err != 0) {
-		LOG_ERR("nrf_fmfu_init failed: %d\n", err);
+		LOG_ERR("nrf_fmfu_init failed, errno: %d\n.", errno);
+		return err;
 	}
 
 	/* Read the whole wrapper. */
