@@ -15,6 +15,8 @@ LOG_MODULE_REGISTER(fmfu_fdev, CONFIG_FMFU_FDEV_LOG_LEVEL);
 
 #define MAX_META_LEN 1000
 
+static uint8_t meta_buf[1024];
+
 static int get_hash_from_flash(const struct device *fdev, size_t offset,
 			       size_t data_len, uint8_t *hash, uint8_t *buffer,
 			       size_t buffer_len)
@@ -47,27 +49,6 @@ static int get_hash_from_flash(const struct device *fdev, size_t offset,
 	err = mbedtls_sha256_finish_ret(&sha256_ctx, hash);
 	if (err != 0) {
 		return err;
-	}
-
-	return 0;
-}
-
-static int prevalidate(const COSE_Sign1_Manifest_t *wrapper, const uint8_t *pk,
-		       size_t pk_len, uint8_t *buf, size_t buf_len)
-{
-	return 0;
-}
-
-static int get_blob_len(const uint8_t *segments_buf, size_t buf_len,
-			size_t *segments_len, Segments_t *segments)
-{
-	if (!cbor_decode_Segments(segments_buf, buf_len, segments, NULL)) {
-		return -EINVAL;
-	}
-
-	*segments_len = 0;
-	for (int i = 0; i < segments->_Segments__Segment_count; i++) {
-		*segments_len += segments->_Segments__Segment[i]._Segment_len;
 	}
 
 	return 0;
@@ -108,7 +89,20 @@ static int load_segment(const struct device *fdev, size_t seg_size,
 	return 0;
 }
 
-static int load_segments(const struct device *fdev, Segments_t *seg,
+static int prevalidate(uint8_t *buf, size_t wrapper_len)
+{
+	int err;
+
+	err = nrf_fmfu_verify_signature(wrapper_len, (void *)buf);
+	if (err != 0) {
+		LOG_ERR("nrf_fmfu_verify_signature failed: %d", errno);
+	}
+
+	return err;
+}
+
+static int load_segments(const struct device *fdev, uint8_t *meta_buf,
+			 size_t wrapper_len, const Segments_t *seg,
 			 size_t blob_offset, uint8_t *buf)
 {
 	int err;
@@ -143,6 +137,18 @@ static int load_segments(const struct device *fdev, Segments_t *seg,
 			return err;
 		}
 
+		if (i == 0) {
+			/* This is the first segment, which contains the
+			 * IPC-DFU bootloader. We can now perform the
+			 * signature verification.
+			 */
+			err = prevalidate(meta_buf, wrapper_len);
+			if (err != 0) {
+				LOG_ERR("Prevalidate failed: %d", err);
+				return err;
+			}
+		}
+
 		prev_segments_len += seg_size;
 
 		LOG_INF("Segment %d written. Target addr: 0x%x, size: 0%x",
@@ -162,9 +168,9 @@ int fmfu_fdev_load(uint8_t *buf, size_t buf_len,
 	bool hash_len_valid = false;
 	uint8_t expected_hash[32];
 	bool hash_valid = false;
-	bool sig_valid = false;
 	Segments_t segments;
 	size_t blob_offset;
+	size_t wrapper_len;
 	uint8_t hash[32];
 	size_t blob_len;
 	int err;
@@ -182,46 +188,38 @@ int fmfu_fdev_load(uint8_t *buf, size_t buf_len,
 	}
 
 	/* Read the whole wrapper. */
-	err = flash_read(fdev, offset, buf, MAX_META_LEN);
+	err = flash_read(fdev, offset, meta_buf, MAX_META_LEN);
 	if (err != 0) {
 		return err;
 	}
 
-	/* Pass 'blob_offset' so that it will get the length of the decoded
-	 * data
-	 */
-	if (!cbor_decode_Wrapper(buf, MAX_META_LEN, &wrapper, &blob_offset)) {
+	if (!cbor_decode_Wrapper(meta_buf, MAX_META_LEN, &wrapper, &wrapper_len)) {
 		return -EINVAL;
-	}
-
-	/* Prevalidate as soon as possible to avoid reading unvalidated data */
-	err = prevalidate(&wrapper, NULL, 0, &buf[MAX_META_LEN], MAX_META_LEN);
-	if (err == 0) {
-		sig_valid = true;
-	} else {
-		return err;
 	}
 
 	/* Add the base offset of the wrapper to the blob offset to get the
 	 * absolute offset to the blob in the flash device.
 	 */
-	blob_offset += offset;
+	blob_offset = wrapper_len + offset;
 
-	/* Get a pointer to the segments as this is a cbor encoded structure
-	 * in itself.
+	/* Get a pointer to, and decode,  the segments as this is a cbor encoded
+	 * structure in itself.
 	 */
 	segments_string = &wrapper._COSE_Sign1_Manifest_payload_cbor
 			._Manifest_segments;
+	if (!cbor_decode_Segments(segments_string->value,
+				  segments_string->len, &segments, NULL)) {
+		return -EINVAL;
+	}
 
 	/* Extract the expected hash from the manifest */
 	memcpy(expected_hash, wrapper._COSE_Sign1_Manifest_payload_cbor
 			._Manifest_blob_hash.value, sizeof(expected_hash));
 
 	/* Calculate total length of all segments */
-	err = get_blob_len(segments_string->value, segments_string->len,
-			   &blob_len, &segments);
-	if (err != 0) {
-		return err;
+	blob_len = 0;
+	for (int i = 0; i < segments._Segments__Segment_count; i++) {
+		blob_len += segments._Segments__Segment[i]._Segment_len;
 	}
 
 	if (sizeof(hash) == wrapper._COSE_Sign1_Manifest_payload_cbor
@@ -243,8 +241,12 @@ int fmfu_fdev_load(uint8_t *buf, size_t buf_len,
 		return -EINVAL;
 	}
 
-	if (sig_valid && hash_len_valid && hash_valid) {
-		return load_segments(fdev, &segments, blob_offset, buf);
+	if (hash_len_valid && hash_valid) {
+		return load_segments(fdev,
+				meta_buf,
+				wrapper_len,
+				(const Segments_t *)&segments, blob_offset,
+				buf);
 	} else {
 		return -EINVAL;
 	}
