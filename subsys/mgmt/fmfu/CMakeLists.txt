@@ -6,9 +6,9 @@
 
 zephyr_library()
 
-zephyr_library_include_directories(include)
+zephyr_library_link_libraries(MCUMGR)
 
 zephyr_library_sources(
-  src/mfu_mgmt.c
-  src/mfu_mgmt_stat.c
+  src/mgmt_fmfu.c
+  src/mgmt_fmfu_stat.c
   )
