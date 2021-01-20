@@ -11,7 +11,7 @@ def run(uart, modem_firmware_zip, baudrate):
     print('# nrf9160 modem firmware upgrade over serial port example started.')
 
     # Configure logging to see HighLevel API output
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
     # Find the hex file to flash. It should be located in the same directory as
     # this example file.

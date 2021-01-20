@@ -7,7 +7,7 @@
 #include <zephyr.h>
 #include <logging/log.h>
 #include <mgmt/mgmt.h>
-#include <nrf_fmfu.h>
+#include <nrf_modem_full_dfu.h>
 #include <mgmt/mgmt_fmfu.h>
 #include "cborattr/cborattr.h"
 #include <stats/stats.h>
@@ -140,7 +140,7 @@ static int encode_response(struct mgmt_ctxt *ctx, uint32_t expected_offset)
 static int mgmt_firmware_upload(struct mgmt_ctxt *ctx)
 {
 
-	static bool first_chunk = true;
+	static bool bootloader = true;
 
 	int rc;
 	bool whole_file_received;
@@ -157,20 +157,18 @@ static int mgmt_firmware_upload(struct mgmt_ctxt *ctx)
 	LOG_DBG("next_offset: 0x%x", next_expected_offset);
 
 	if (packet.data_len > 0) {
-		if (first_chunk) {
-			rc = nrf_fmfu_transfer_start();
-			if (rc != 0) {
-				LOG_ERR("Error in starting transfer");
-				return get_mgmt_err_from_modem_ret_err(rc);
-			}
-			first_chunk = false;
+		LOG_DBG("target_addr: 0x%x", packet.target_address);
+		if (bootloader) {
+			LOG_DBG("Writing bootloader packet with len:%d", packet.data_len);
+			rc = nrf_modem_full_dfu_bl_write(packet.data_len,
+							 packet.data);
+		} else {
+			LOG_DBG("Writing firmware packet with len:%d", packet.data_len);
+			rc = nrf_modem_full_dfu_fw_write(packet.target_address,
+						         packet.data_len,
+						         packet.data);
 		}
 
-		LOG_DBG("target_addr: 0x%x", packet.target_address);
-		LOG_DBG("Writing firmware packet with len:%d", packet.data_len);
-		rc = nrf_fmfu_memory_chunk_write(packet.target_address,
-						 packet.data_len,
-						 packet.data);
 		if (rc != 0) {
 			LOG_ERR("Error in writing data: %d", errno);
 			return get_mgmt_err_from_modem_ret_err(rc);
@@ -178,12 +176,12 @@ static int mgmt_firmware_upload(struct mgmt_ctxt *ctx)
 	}
 
 	if (whole_file_received) {
-		rc = nrf_fmfu_transfer_end();
+		rc = nrf_modem_full_dfu_apply();
 		if (rc != 0) {
 			LOG_ERR("Error in transfer_end");
 			return get_mgmt_err_from_modem_ret_err(rc);
 		}
-		first_chunk = true;
+		bootloader = false;
 	}
 
 	return encode_response(ctx, next_expected_offset);
@@ -193,7 +191,7 @@ static int mgmt_get_memory_hash(struct mgmt_ctxt *ctxt)
 {
 	unsigned long long start;
 	unsigned long long end;
-	struct nrf_fmfu_digest digest;
+	struct nrf_modem_full_dfu_digest digest;
 
 	/* We expect two variables: the start and end address of a memory region
 	 * that we want to verify (obtain a hash for)
@@ -222,7 +220,7 @@ static int mgmt_get_memory_hash(struct mgmt_ctxt *ctxt)
 		return MGMT_ERR_EINVAL;
 	}
 
-	rc = nrf_fmfu_memory_hash_get(start, end - start, &digest);
+	rc = nrf_modem_full_dfu_digest(start, end - start, &digest);
 
 	if (rc != 0) {
 		LOG_ERR("nrf_fmfu_hash_get failed, errno: %d.", errno);
@@ -235,7 +233,7 @@ static int mgmt_get_memory_hash(struct mgmt_ctxt *ctxt)
 
 	cbor_err |= cbor_encode_text_stringz(&ctxt->encoder, "digest");
 	cbor_err |= cbor_encode_byte_string(&ctxt->encoder,
-			(uint8_t *)digest.data, NRF_FMFU_DIGEST_BUFFER_LEN);
+			(uint8_t *)digest.data, NRF_MODEM_FULL_DFU_DIGEST_LEN);
 	cbor_err |= cbor_encode_text_stringz(&ctxt->encoder, "rc");
 	cbor_err |= cbor_encode_int(&ctxt->encoder, rc);
 	if (cbor_err != 0) {
@@ -264,13 +262,12 @@ static struct mgmt_group fmfu_mgmt_group = {
 
 int mgmt_fmfu_init(void)
 {
-	struct nrf_fmfu_digest digest;
-	uint32_t len;
+	struct nrf_modem_full_dfu_digest digest;
 
-	int err = nrf_fmfu_init(&digest, &len);
+	int err = nrf_modem_full_dfu_init(&digest);
 
 	if (err != 0) {
-		LOG_ERR("nrf_fmfu_init failed, errno: %d\n.", errno);
+		LOG_ERR("nrf_modem_full_dfu_init failed, errno: %d\n.", errno);
 		return err;
 	}
 	mgmt_register_group(&fmfu_mgmt_group);

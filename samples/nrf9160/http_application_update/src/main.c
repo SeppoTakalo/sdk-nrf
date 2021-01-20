@@ -32,7 +32,7 @@ static struct gpio_callback gpio_cb_b2;
 static struct k_work fota_work;
 static struct k_work fmfu_work;
 static char modem_version[256];
-static uint8_t fota_buf[NRF_FMFU_MODEM_BUFFER_SIZE];
+static uint8_t fota_buf[NRF_MODEM_FULL_DFU_SHM_LEN];
 static bool downloading_modem_firmware;
 
 #ifndef CONFIG_USE_HTTPS

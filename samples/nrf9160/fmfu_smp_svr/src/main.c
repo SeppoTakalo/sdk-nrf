@@ -8,7 +8,7 @@
 #include <mgmt/mgmt_fmfu.h>
 #include <mgmt/mgmt_fmfu_stat.h>
 #include <modem/modem_info.h>
-#include <modem/libmodem.h>
+#include <modem/nrf_modem_lib.h>
 #include <modem/at_cmd.h>
 
 void main(void)
@@ -21,7 +21,8 @@ void main(void)
 	printk("Modem version: %s\n\r", modem_version);
 
 	/* Shutdown modem to prepare for DFU */
-	libmodem_shutdown();
+	nrf_modem_lib_shutdown();
+	nrf_modem_lib_init(FULL_DFU_MODE);
 	/* Register SMP Communication stats */
 	mgmt_fmfu_stat_init();
 	/* Initialize MCUMgr handlers for full modem update */
@@ -34,4 +35,3 @@ void main(void)
 		k_cpu_idle();
 	}
 }
-

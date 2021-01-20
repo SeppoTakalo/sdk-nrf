@@ -63,7 +63,7 @@ static int load_segment(const struct device *fdev, size_t seg_size,
 	size_t bytes_left = seg_size;
 
 	while (bytes_left) {
-		uint32_t read_len = MIN(NRF_FMFU_MODEM_BUFFER_SIZE, bytes_left);
+		uint32_t read_len = MIN(NRF_MODEM_FULL_DFU_SHM_LEN, bytes_left);
 
 		err = flash_read(fdev, read_addr, buf, read_len);
 		if (err != 0) {
@@ -71,10 +71,10 @@ static int load_segment(const struct device *fdev, size_t seg_size,
 			return err;
 		}
 
-		err = nrf_fmfu_memory_chunk_write(seg_target_addr, read_len,
+		err = nrf_modem_full_dfu_fw_write(seg_target_addr, read_len,
 						  buf);
 		if (err != 0) {
-			LOG_ERR("nrf_fmfu_memory_chunk_write failed: %d", err);
+			LOG_ERR("nrf_modem_full_dfu_fw_write failed: %d", err);
 			return err;
 		}
 
@@ -93,9 +93,9 @@ static int prevalidate(uint8_t *buf, size_t wrapper_len)
 {
 	int err;
 
-	err = nrf_fmfu_verify_signature(wrapper_len, (void *)buf);
+	err = nrf_modem_full_dfu_verify(wrapper_len, (void *)buf);
 	if (err != 0) {
-		LOG_ERR("nrf_fmfu_verify_signature failed: %d", errno);
+		LOG_ERR("nrf_modem_full_dfu_verify failed: %d", errno);
 	}
 
 	return err;
@@ -116,9 +116,9 @@ static int load_segments(const struct device *fdev, uint8_t *meta_buf,
 			seg->_Segments__Segment[i]._Segment_target_addr;
 		uint32_t read_addr = blob_offset + prev_segments_len;
 
-		err = nrf_fmfu_transfer_start();
+		err = nrf_modem_full_dfu_begin();
 		if (err != 0) {
-			LOG_ERR("nrf_fmfu_transfer_start failed: %d", err);
+			LOG_ERR("nrf_modem_full_dfu_begin failed: %d", err);
 			return err;
 		}
 
@@ -128,12 +128,12 @@ static int load_segments(const struct device *fdev, uint8_t *meta_buf,
 			return err;
 		}
 
-		LOG_DBG("Modem state: %d", nrf_fmfu_modem_state_get());
+		LOG_DBG("Modem state: %d", nrf_modem_full_dfu_state());
 
-		err = nrf_fmfu_transfer_end();
+		err = nrf_modem_full_dfu_apply();
 		if (err != 0) {
-			LOG_ERR("nrf_fmfu_transfer_end failed, state: %d errno: %d",
-				nrf_fmfu_modem_state_get(), errno);
+			LOG_ERR("nrf_modem_full_dfu_apply failed, state: %d errno: %d",
+				nrf_modem_full_dfu_state(), errno);
 			return err;
 		}
 
@@ -180,10 +180,10 @@ int fmfu_fdev_load(uint8_t *buf, size_t buf_len,
 	}
 
 	/* Put modem in DFU/RPC state */
-	err = nrf_fmfu_init(NULL, NRF_FMFU_MODEM_BUFFER_SIZE,
+	err = nrf_modem_full_dfu_init(NULL, NRF_MODEM_FULL_DFU_SHM_LEN,
 		       	(uint8_t *)0x20010000);
 	if (err != 0) {
-		LOG_ERR("nrf_fmfu_init failed, errno: %d\n.", errno);
+		LOG_ERR("nrf_modem_full_dfu_init failed, errno: %d\n.", errno);
 		return err;
 	}
 
