@@ -69,7 +69,7 @@ static int _nrf_modem_lib_init(const struct device *unused)
 #endif
 	};
 
-	init_ret = nrf_modem_init(&init_params);
+	init_ret = nrf_modem_init(&init_params, NORMAL_MODE);
 
 	k_mutex_lock(&slist_mutex, K_FOREVER);
 	if (sys_slist_peek_head(&shutdown_threads) != NULL) {
@@ -112,9 +112,21 @@ void nrf_modem_lib_shutdown_wait(void)
 	k_mutex_unlock(&slist_mutex);
 }
 
-int nrf_modem_lib_init(void)
+int nrf_modem_lib_init(enum nrf_modem_mode_t mode)
 {
-	return _nrf_modem_lib_init(NULL);
+	if (mode == NORMAL_MODE) {
+		return _nrf_modem_lib_init(NULL);
+	} else {
+		const nrf_modem_init_params_t init_params = {
+			.shmem.ctrl = {
+				.base = PM_NRF_MODEM_LIB_CTRL_ADDRESS,
+				.size = CONFIG_NRF_MODEM_LIB_SHMEM_CTRL_SIZE +
+					CONFIG_NRF_MODEM_LIB_SHMEM_TX_SIZE +
+					CONFIG_NRF_MODEM_LIB_SHMEM_RX_SIZE
+			}
+		};
+		return nrf_modem_init(&init_params, FULL_DFU_MODE);
+	}
 }
 
 int nrf_modem_lib_get_init_ret(void)
