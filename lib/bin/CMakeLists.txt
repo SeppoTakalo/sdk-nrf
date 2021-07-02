@@ -5,3 +5,4 @@
 #
 
 add_subdirectory_ifdef(CONFIG_LWM2M_CARRIER lwm2m_carrier)
+add_subdirectory_ifdef(CONFIG_NRF_MODEM_FOTA_CARRIER modem_fota_carrier)
