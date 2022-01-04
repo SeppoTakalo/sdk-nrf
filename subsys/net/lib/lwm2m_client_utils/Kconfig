@@ -59,6 +59,12 @@ config LWM2M_CLIENT_UTILS_DOWNLOADER_SEC_TAG
 
 endif # LWM2M_CLIENT_UTILS_FIRMWARE_UPDATE_OBJ_SUPPORT
 
+config LWM2M_CLIENT_UTILS_NRFCLOUD_PROXY
+	bool "Send nrfCloud REST queries through LwM2M proxy"
+	default n
+	help
+	  This feature is a proprietary LwM2M to nrfCloud proxy support.
+
 module = LWM2M_CLIENT_UTILS
 module-dep = LOG
 module-str = LwM2M client utilities library
