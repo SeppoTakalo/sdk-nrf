@@ -35,6 +35,8 @@ LOG_MODULE_REGISTER(app_lwm2m_client, CONFIG_APP_LOG_LEVEL);
 #include "sensor_module.h"
 #include "gps_module.h"
 #include "lwm2m_engine.h"
+#include "ui_input.h"
+#include "ui_input_event.h"
 
 #if !defined(CONFIG_LTE_LINK_CONTROL)
 #error "Missing CONFIG_LTE_LINK_CONTROL"
@@ -175,6 +177,27 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 		break;
 	}
 }
+
+static bool event_handler(const struct event_header *eh)
+{
+	if (is_ui_input_event(eh)) {
+		struct ui_input_event *event = cast_ui_input_event(eh);
+
+		if (event->type != PUSH_BUTTON) {
+			return false;
+		}
+		if (event->device_number == 2 && event->state == 1) {
+			reconnect = true;
+			k_sem_give(&lwm2m_restart);
+		} else if (event->device_number == 1 && event->state == 1) {
+			k_sem_give(&lwm2m_restart);
+		}
+	}
+	return false;
+}
+
+EVENT_LISTENER(MODULE, event_handler);
+EVENT_SUBSCRIBE(MODULE, ui_input_event);
 
 static void rd_client_event(struct lwm2m_ctx *client, enum lwm2m_rd_client_event client_event)
 {
