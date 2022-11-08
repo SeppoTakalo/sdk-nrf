@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <modem/modem_info.h>
 #include <ncs_version.h>
 #include <zephyr/dfu/mcuboot.h>
+#include <pm_config.h>
 
 #define LWM2M_OBJECT_ADV_FIRMWARE_ID 33629
 #define FIRMWARE_VERSION_MAJOR 1
@@ -450,7 +451,7 @@ int lwm2m_adv_firmware_create_inst(const char *component, lwm2m_engine_get_data_
 		lwm2m_engine_set_string(path, buf);
 	} else {
 		struct mcuboot_img_header header;
-		boot_read_bank_header(0, &header, sizeof(header));
+		boot_read_bank_header(PM_MCUBOOT_PRIMARY_ID, &header, sizeof(header));
 		char buf[255];
 		snprintk(buf, sizeof(buf), "%d.%d.%d-%d", header.h.v1.sem_ver.major, header.h.v1.sem_ver.minor, header.h.v1.sem_ver.revision, header.h.v1.sem_ver.build_num);
 		lwm2m_engine_set_string(path, buf);
