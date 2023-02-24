@@ -47,6 +47,9 @@ enum download_client_evt_id {
 	 * - EHOSTDOWN: host went down during download
 	 * - EBADMSG: HTTP response header not as expected
 	 * - E2BIG: HTTP response header could not fit in buffer
+	 * - EPROTONOSUPPORT: Protocol is not supported
+	 * - EINVAL: Invalid configuration
+	 * - EAFNOSUPPORT: Unsupported address family (IPv4/IPv6)
 	 *
 	 * In case of errors on the socket during send() or recv() (ECONNRESET),
 	 * returning zero from the callback will let the library attempt

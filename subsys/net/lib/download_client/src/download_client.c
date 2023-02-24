@@ -216,6 +216,17 @@ static int client_connect(struct download_client *dl)
 	uint16_t port;
 	socklen_t addrlen;
 
+	/* Attempt IPv6 connection if configured, fallback to IPv4 */
+	if (IS_ENABLED(CONFIG_DOWNLOAD_CLIENT_IPV6)) {
+		err = host_lookup(dl->host, AF_INET6, dl->config.pdn_id, &dl->remote_addr);
+	}
+	if (err || !IS_ENABLED(CONFIG_DOWNLOAD_CLIENT_IPV6)) {
+		err = host_lookup(dl->host, AF_INET, dl->config.pdn_id, &dl->remote_addr);
+	}
+	if (err) {
+		return err;
+	}
+
 	err = url_parse_proto(dl->host, &dl->proto, &type);
 	if (err) {
 		LOG_DBG("Protocol not specified, defaulting to HTTP(S)");
@@ -319,8 +330,8 @@ static int client_connect(struct download_client *dl)
 
 	err = connect(dl->fd, &dl->remote_addr, addrlen);
 	if (err) {
-		LOG_ERR("Unable to connect, errno %d", errno);
 		err = -errno;
+		LOG_ERR("Unable to connect, errno %d", errno);
 	}
 
 cleanup:
@@ -417,7 +428,9 @@ static int reconnect(struct download_client *dl)
 		return err;
 	}
 
-	return 0;
+	err = client_connect(dl);
+
+	return err;
 }
 
 static ssize_t socket_recv(struct download_client *dl)
@@ -482,6 +495,21 @@ void download_thread(void *client, void *a, void *b)
 
 wait_for_download:
 	k_sem_take(&dl->wait_for_download, K_FOREVER);
+
+	if (dl->fd == -1) {
+		rc = client_connect(dl);
+
+		if (rc == 0) {
+			if (IS_ENABLED(CONFIG_COAP) &&
+			    (dl->proto == IPPROTO_UDP || dl->proto == IPPROTO_DTLS_1_2)) {
+				coap_block_init(client, dl->progress);
+			}
+			rc = request_send(dl);
+		}
+		if (rc) {
+			error_evt_send(dl, -rc);
+		}
+	}
 
 	while (dl->fd != -1) {
 		__ASSERT(dl->offset < sizeof(dl->buf), "Buffer overflow");
@@ -680,13 +708,11 @@ int download_client_init(struct download_client *const client,
 int download_client_connect(struct download_client *client, const char *host,
 			    const struct download_client_cfg *config)
 {
-	int err;
-
 	if (client == NULL || host == NULL || config == NULL) {
 		return -EINVAL;
 	}
 
-	if (client->fd != -1 || client->host) {
+	if (client->fd != -1) {
 		/* Already connected */
 		return -EALREADY;
 	}
@@ -696,27 +722,8 @@ int download_client_connect(struct download_client *client, const char *host,
 		return -E2BIG;
 	}
 
-	err = 0;
-	/* Attempt IPv6 connection if configured, fallback to IPv4 */
-	if (IS_ENABLED(CONFIG_DOWNLOAD_CLIENT_IPV6)) {
-		err = host_lookup(host, AF_INET6, config->pdn_id, &client->remote_addr);
-	}
-	if (err || !IS_ENABLED(CONFIG_DOWNLOAD_CLIENT_IPV6)) {
-		err = host_lookup(host, AF_INET, config->pdn_id, &client->remote_addr);
-	}
-
-	if (err) {
-		return err;
-	}
-
 	client->config = *config;
 	client->host = host;
-
-	err = client_connect(client);
-	if (client->fd < 0) {
-		return err;
-	}
-
 	return 0;
 }
 
@@ -742,14 +749,12 @@ int download_client_disconnect(struct download_client *const client)
 int download_client_start(struct download_client *client, const char *file,
 			  size_t from)
 {
-	int err;
-
-	if (client == NULL) {
+	if (client == NULL || client->host == NULL) {
 		return -EINVAL;
 	}
 
-	if (client->fd < 0) {
-		return -ENOTCONN;
+	if (client->fd >= 0) {
+		return -EALREADY;
 	}
 
 	client->file = file;
@@ -758,17 +763,6 @@ int download_client_start(struct download_client *client, const char *file,
 
 	client->offset = 0;
 	client->http.has_header = false;
-
-	if (client->proto == IPPROTO_UDP || client->proto == IPPROTO_DTLS_1_2) {
-		if (IS_ENABLED(CONFIG_COAP)) {
-			coap_block_init(client, from);
-		}
-	}
-
-	err = request_send(client);
-	if (err) {
-		return err;
-	}
 
 	LOG_INF("Downloading: %s [%u]", client->file, client->progress);
 
