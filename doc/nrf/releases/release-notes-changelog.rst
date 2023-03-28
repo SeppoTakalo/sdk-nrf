@@ -412,6 +412,11 @@ Libraries for networking
 
     * The old API ``lwm2m_firmware_get_update_state_cb()``.
 
+* :ref:`lib_download_client` library:
+
+  * Refactored :c:func:`download_client_connect` to :c:func:`download_client_set_host` and made it non-blocking.
+  * Added :c:func:`download_client_get` which combines functionality of :c:func:`download_client_set_host`, :c:func:`download_client_start` and :c:func:`download_client_disconnect`
+
 Libraries for NFC
 -----------------
 

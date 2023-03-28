@@ -62,6 +62,10 @@ static int set_recv_socket_timeout(int fd, int timeout_ms)
 		return 0;
 	}
 
+	if (fd == -1) {
+		return -1;
+	}
+
 	struct timeval timeo = {
 		.tv_sec = (timeout_ms / 1000),
 		.tv_usec = (timeout_ms % 1000) * 1000,
@@ -418,15 +422,12 @@ static int reconnect(struct download_client *dl)
 	int err;
 
 	LOG_INF("Reconnecting..");
-	err = download_client_disconnect(dl);
+	err = close(dl->fd);
 	if (err) {
+		LOG_DBG("disconnect failed, %d", err);
 		return err;
 	}
-
-	err = download_client_connect(dl, dl->host, &dl->config);
-	if (err) {
-		return err;
-	}
+	dl->fd = -1;
 
 	err = client_connect(dl);
 
@@ -496,7 +497,7 @@ void download_thread(void *client, void *a, void *b)
 wait_for_download:
 	k_sem_take(&dl->wait_for_download, K_FOREVER);
 
-	if (dl->fd == -1) {
+	if (dl->fd == -1 && dl->host != NULL) {
 		rc = client_connect(dl);
 
 		if (rc == 0) {
@@ -521,8 +522,8 @@ wait_for_download:
 			break;
 		}
 
-		LOG_DBG("Receiving up to %d bytes at %p...",
-			(sizeof(dl->buf) - dl->offset), (dl->buf + dl->offset));
+		LOG_DBG("Receiving up to %d bytes at %p...", (sizeof(dl->buf) - dl->offset),
+			(void *)(dl->buf + dl->offset));
 
 		len = socket_recv(dl);
 
@@ -675,6 +676,12 @@ send_again:
 		}
 	}
 
+	dl->file = NULL;
+	if (dl->close_when_done && dl->fd != -1) {
+		download_client_disconnect(dl);
+		LOG_DBG("Connection closed automatically");
+	}
+
 	/* Do not let the thread return, since it can't be restarted */
 	goto wait_for_download;
 }
@@ -705,7 +712,7 @@ int download_client_init(struct download_client *const client,
 	return 0;
 }
 
-int download_client_connect(struct download_client *client, const char *host,
+int download_client_set_host(struct download_client *client, const char *host,
 			    const struct download_client_cfg *config)
 {
 	if (client == NULL || host == NULL || config == NULL) {
@@ -724,7 +731,14 @@ int download_client_connect(struct download_client *client, const char *host,
 
 	client->config = *config;
 	client->host = host;
+	client->close_when_done = false;
 	return 0;
+}
+
+int download_client_connect(struct download_client *client, const char *host,
+			    const struct download_client_cfg *config)
+{
+	return download_client_set_host(client, host, config);
 }
 
 int download_client_disconnect(struct download_client *const client)
@@ -742,6 +756,9 @@ int download_client_disconnect(struct download_client *const client)
 	}
 
 	client->fd = -1;
+	client->close_when_done = false;
+	client->host = NULL;
+	client->file = NULL;
 
 	return 0;
 }
@@ -753,14 +770,13 @@ int download_client_start(struct download_client *client, const char *file,
 		return -EINVAL;
 	}
 
-	if (client->fd >= 0) {
+	if (client->file) {
 		return -EALREADY;
 	}
 
 	client->file = file;
 	client->file_size = 0;
 	client->progress = from;
-
 	client->offset = 0;
 	client->http.has_header = false;
 
@@ -770,6 +786,21 @@ int download_client_start(struct download_client *client, const char *file,
 	k_sem_give(&client->wait_for_download);
 
 	return 0;
+}
+
+int download_client_get(struct download_client *client, const char *host,
+			const struct download_client_cfg *config, const char *file, size_t from)
+{
+	int rc;
+
+	rc = download_client_set_host(client, host, config);
+
+	if (rc == 0) {
+		client->close_when_done = true;
+		rc = download_client_start(client, file, from);
+	}
+
+	return rc;
 }
 
 void download_client_pause(struct download_client *client)

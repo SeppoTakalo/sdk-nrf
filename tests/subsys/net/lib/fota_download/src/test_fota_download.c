@@ -115,7 +115,7 @@ int download_client_init(struct download_client *client,
 	return 0;
 }
 
-int download_client_connect(struct download_client *client, const char *host,
+int download_client_set_host(struct download_client *client, const char *host,
 			    const struct download_client_cfg *config)
 {
 	if (fail_on_connect == true) {
