@@ -572,17 +572,17 @@ static int handle_received(struct download_client *dl, ssize_t len)
 		rc = http_parse(dl, len);
 		if (rc > 0) {
 			/* Wait for more data (fragment/header) */
-			return 1;
+			rc = 1;
 		}
 	} else if (IS_ENABLED(CONFIG_COAP)) {
 		rc = coap_parse(dl, (size_t)len);
 		if (rc == 1) {
 			/* Duplicate packet received */
-			return 1;
+			rc = 1;
 		}
 	} else {
 		/* Unknown protocol */
-		return -1;
+		rc = -1;
 	}
 
 	if (rc < 0) {
@@ -603,11 +603,10 @@ static int handle_received(struct download_client *dl, ssize_t len)
 	/* Send fragment to application.
 	 * If the application callback returns non-zero, stop.
 	 */
-	rc = fragment_evt_send(dl);
-	if (rc) {
+	if (fragment_evt_send(dl)) {
 		/* Restart and suspend */
 		LOG_INF("Fragment refused, download stopped.");
-		return -1;
+		rc = -1;
 	}
 
 	if (dl->progress == dl->file_size) {
@@ -617,21 +616,21 @@ static int handle_received(struct download_client *dl, ssize_t len)
 		};
 		dl->callback(&evt);
 		/* Restart and suspend */
-		return -1;
+		rc = -1;
 	}
 
 	/* Attempt to reconnect if the connection was closed */
-	if (dl->http.connection_close) {
+	if (dl->http.connection_close && rc >= 0) {
 		dl->http.connection_close = false;
 		k_mutex_lock(&dl->mutex, K_FOREVER);
 		rc = reconnect(dl);
 		k_mutex_unlock(&dl->mutex);
 		if (rc) {
 			error_evt_send(dl, EHOSTDOWN);
-			return -1;
+			rc = -1;
 		}
 	}
-	return 0;
+	return rc;
 }
 
 void download_thread(void *client, void *a, void *b)
@@ -655,6 +654,7 @@ void download_thread(void *client, void *a, void *b)
 
 		if (rc) {
 			error_evt_send(dl, -rc);
+			continue;
 		}
 
 		/* Initialize CoAP */
@@ -669,10 +669,10 @@ void download_thread(void *client, void *a, void *b)
 
 		/* Request loop */
 		while (true) {
-			/* Request next fragment */
 			dl->offset = 0;
-			if (dl->proto != IPPROTO_TCP || len == 0 ||
+			if (dl->proto != IPPROTO_TCP || (len == 0 && rc == 0) ||
 			    IS_ENABLED(CONFIG_DOWNLOAD_CLIENT_RANGE_REQUESTS)) {
+				/* Request next fragment */
 				dl->http.has_header = false;
 
 				k_mutex_lock(&dl->mutex, K_FOREVER);
@@ -700,12 +700,6 @@ void download_thread(void *client, void *a, void *b)
 				}
 			}
 
-			k_mutex_lock(&dl->mutex, K_FOREVER);
-			if (dl->fd < 0 || rc < 0) {
-				k_mutex_unlock(&dl->mutex);
-				break;
-			}
-			k_mutex_unlock(&dl->mutex);
 			__ASSERT(dl->offset < sizeof(dl->buf), "Buffer overflow");
 
 			if (sizeof(dl->buf) - dl->offset == 0) {
