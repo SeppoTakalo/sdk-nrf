@@ -191,7 +191,6 @@ void main(void)
 	}
 
 	printk("OK\n");
-
 	err = download_client_init(&downloader, callback);
 	if (err) {
 		printk("Failed to initialize the client, err %d", err);
@@ -203,15 +202,9 @@ void main(void)
 	mbedtls_sha256_starts(&sha256_ctx, false);
 #endif
 
-	err = download_client_connect(&downloader, URL, &config);
-	if (err) {
-		printk("Failed to connect, err %d", err);
-		return;
-	}
-
 	ref_time = k_uptime_get();
 
-	err = download_client_start(&downloader, URL, STARTING_OFFSET);
+	err = download_client_get(&downloader, URL, &config, URL, STARTING_OFFSET);
 	if (err) {
 		printk("Failed to start the downloader, err %d", err);
 		return;

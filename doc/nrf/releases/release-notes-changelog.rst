@@ -416,6 +416,7 @@ Libraries for networking
 
   * Refactored :c:func:`download_client_connect` to :c:func:`download_client_set_host` and made it non-blocking.
   * Added :c:func:`download_client_get` which combines functionality of :c:func:`download_client_set_host`, :c:func:`download_client_start` and :c:func:`download_client_disconnect`
+  * Removed :c:fun:`donwload_client_pause` and :c:func:`donwload_client_resume`
 
 Libraries for NFC
 -----------------

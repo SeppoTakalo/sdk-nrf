@@ -73,7 +73,7 @@ static int cmd_dc_config_pdn_id(const struct shell *shell, size_t argc,
 {
 	if (argc != 2) {
 		shell_warn(shell, "usage: dc config pdn <pdn_id>\n");
-		return 0;
+		return -EINVAL;
 	}
 
 	config.pdn_id = atoi(argv[1]);
@@ -87,7 +87,7 @@ static int cmd_dc_config_sec_tag(const struct shell *shell, size_t argc,
 {
 	if (argc != 2) {
 		shell_warn(shell, "usage: dc config sec_tag <sec_tag>\n");
-		return 0;
+		return -EINVAL;
 	}
 
 	config.sec_tag = atoi(argv[1]);
@@ -104,7 +104,7 @@ static int cmd_dc_set_host(const struct shell *shell, size_t argc, char **argv)
 
 	if (argc != 2) {
 		shell_warn(shell, "usage: dc connect <host>|<url>");
-		return 0;
+		return -EINVAL;
 	}
 
 	memcpy(host, argv[1], MIN(strlen(argv[1]) + 1, sizeof(host)));
@@ -113,33 +113,8 @@ static int cmd_dc_set_host(const struct shell *shell, size_t argc, char **argv)
 	if (err) {
 		shell_warn(shell, "download_client_set_host() failed, err %d",
 			   err);
+		return -ENOEXEC;
 	}
-
-	return 0;
-}
-
-static int cmd_dc_pause(const struct shell *shell, size_t argc, char **argv)
-{
-	if (argc != 1) {
-		shell_warn(shell, "usage: dc pause");
-		return 0;
-	}
-
-	download_client_pause(&downloader);
-	shell_print(shell, "Paused");
-
-	return 0;
-}
-
-static int cmd_dc_resume(const struct shell *shell, size_t argc, char **argv)
-{
-	if (argc != 1) {
-		shell_warn(shell, "usage: dc resume");
-		return 0;
-	}
-
-	download_client_resume(&downloader);
-	shell_print(shell, "Resuming");
 
 	return 0;
 }
@@ -150,7 +125,7 @@ static int cmd_dc_download(const struct shell *shell, size_t argc, char **argv)
 
 	if (argc != 2) {
 		shell_warn(shell, "usage: dc download <url>");
-		return 0;
+		return -ENOEXEC;
 	}
 
 	memcpy(file, argv[1], MIN(strlen(argv[1]) + 1, sizeof(file)));
@@ -168,10 +143,11 @@ static int cmd_dc_download(const struct shell *shell, size_t argc, char **argv)
 static int cmd_dc_get(const struct shell *shell, size_t argc, char **argv)
 {
 	int err;
+	size_t from = 0;
 
-	if (argc != 3) {
-		shell_warn(shell, "usage: dc get <url> <file>");
-		return 0;
+	if (argc < 3) {
+		shell_warn(shell, "usage: dc get <url> <file> [offset]");
+		return -EINVAL;
 	}
 
 	shell_instance = shell;
@@ -179,11 +155,21 @@ static int cmd_dc_get(const struct shell *shell, size_t argc, char **argv)
 	memcpy(host, argv[1], MIN(strlen(argv[1]) + 1, sizeof(host)));
 	memcpy(file, argv[2], MIN(strlen(argv[1]) + 1, sizeof(file)));
 
-	err = download_client_get(&downloader, host, &config, file, 0);
+	if (argc > 3) {
+		errno = 0;
+		from = strtol(argv[3], NULL, 0);
+		if (errno == ERANGE) {
+			shell_warn(shell, "invalid offset");
+			return -EINVAL;
+		}
+	}
+
+	err = download_client_get(&downloader, host, &config, file, from);
 
 	if (err) {
 		shell_warn(shell, "download_client_get() failed, err %d",
 			   err);
+		return -ENOEXEC;
 	} else {
 		shell_print(shell, "Downloading");
 	}
@@ -208,8 +194,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_dc,
 	SHELL_CMD(disconnect, NULL, "Disconnect from a host",
 		  cmd_dc_disconnect),
 	SHELL_CMD(download, NULL, "Download a file", cmd_dc_download),
-	SHELL_CMD(pause, NULL, "Pause download", cmd_dc_pause),
-	SHELL_CMD(resume, NULL, "Resume download", cmd_dc_resume),
 	SHELL_CMD(get, NULL, "Download", cmd_dc_get),
 	SHELL_SUBCMD_SET_END
 );
